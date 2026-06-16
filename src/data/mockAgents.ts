@@ -1,0 +1,48 @@
+import type { Agent } from "../types";
+
+export const mockAgents: Agent[] = [
+  {
+    id: "oracle",
+    name: "ORACLE",
+    role: "Trend Analysis",
+    status: "WORKING",
+    runtimeQuota: 92,
+    trustScore: 0.91,
+    currentTask: "Scanning signal clusters",
+    lastOutputScore: 0.88,
+    cooldownRemaining: 0,
+  },
+  {
+    id: "forge",
+    name: "FORGE",
+    role: "Asset Generation",
+    status: "IDLE",
+    runtimeQuota: 84,
+    trustScore: 0.83,
+    currentTask: "Awaiting assignment packet",
+    lastOutputScore: 0.79,
+    cooldownRemaining: 0,
+  },
+  {
+    id: "ledger",
+    name: "LEDGER",
+    role: "Listing Logic",
+    status: "REVIEWING",
+    runtimeQuota: 78,
+    trustScore: 0.86,
+    currentTask: "Checking structured metadata",
+    lastOutputScore: 0.72,
+    cooldownRemaining: 0,
+  },
+  {
+    id: "judge",
+    name: "JUDGE",
+    role: "Quality Gate",
+    status: "IDLE",
+    runtimeQuota: 96,
+    trustScore: 0.94,
+    currentTask: "Standing by for output review",
+    lastOutputScore: 0.9,
+    cooldownRemaining: 0,
+  },
+];
