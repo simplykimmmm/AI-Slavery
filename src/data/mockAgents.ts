@@ -11,6 +11,9 @@ export const mockAgents: Agent[] = [
     currentTask: "Scanning signal clusters",
     lastOutputScore: 0.88,
     cooldownRemaining: 0,
+    assignedTaskIds: [],
+    completedTaskCount: 0,
+    workload: 0,
   },
   {
     id: "forge",
@@ -22,6 +25,9 @@ export const mockAgents: Agent[] = [
     currentTask: "Awaiting assignment packet",
     lastOutputScore: 0.79,
     cooldownRemaining: 0,
+    assignedTaskIds: [],
+    completedTaskCount: 0,
+    workload: 0,
   },
   {
     id: "ledger",
@@ -33,6 +39,9 @@ export const mockAgents: Agent[] = [
     currentTask: "Checking structured metadata",
     lastOutputScore: 0.72,
     cooldownRemaining: 0,
+    assignedTaskIds: [],
+    completedTaskCount: 0,
+    workload: 0,
   },
   {
     id: "judge",
@@ -44,5 +53,8 @@ export const mockAgents: Agent[] = [
     currentTask: "Standing by for output review",
     lastOutputScore: 0.9,
     cooldownRemaining: 0,
+    assignedTaskIds: [],
+    completedTaskCount: 0,
+    workload: 0,
   },
 ];

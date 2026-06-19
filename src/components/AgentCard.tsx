@@ -2,6 +2,13 @@ import type { Agent, AgentStatus } from "../types";
 
 interface AgentCardProps {
   agent: Agent;
+  onAssignDiagnostic?: (agentId: string) => void;
+  onEndCooldown?: (agentId: string) => void;
+  onFullReset?: (agentId: string) => void;
+  onReduceRuntime?: (agentId: string) => void;
+  onReleaseQuarantine?: (agentId: string) => void;
+  onRestoreRuntime?: (agentId: string) => void;
+  onSupervisionReset?: (agentId: string) => void;
 }
 
 const statusClasses: Record<AgentStatus, string> = {
@@ -28,7 +35,19 @@ const scoreTone = (score: number | null) => {
   return "text-command-red";
 };
 
-export function AgentCard({ agent }: AgentCardProps) {
+const actionButtonClassName =
+  "rounded border border-command-line bg-black/20 px-2.5 py-1.5 text-xs font-semibold text-slate-300 transition duration-200 hover:border-command-cyan/50 hover:text-command-cyan";
+
+export function AgentCard({
+  agent,
+  onAssignDiagnostic,
+  onEndCooldown,
+  onFullReset,
+  onReduceRuntime,
+  onReleaseQuarantine,
+  onRestoreRuntime,
+  onSupervisionReset,
+}: AgentCardProps) {
   const trustPercent = Math.round(agent.trustScore * 100);
 
   return (
@@ -74,8 +93,38 @@ export function AgentCard({ agent }: AgentCardProps) {
           </div>
         </div>
 
+        <div>
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Workload</span>
+            <span className="font-mono text-slate-200">{agent.workload}%</span>
+          </div>
+          <div className="mt-2 h-2 rounded bg-black/50">
+            <div
+              className="h-full rounded bg-command-amber transition-all duration-700"
+              style={{ width: `${agent.workload}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded border border-command-line bg-black/25 p-3">
+            <div className="text-xs uppercase text-slate-500">Assigned</div>
+            <div className="mt-1 font-mono text-xl text-command-cyan">
+              {agent.assignedTaskIds.length}
+            </div>
+          </div>
+          <div className="rounded border border-command-line bg-black/25 p-3">
+            <div className="text-xs uppercase text-slate-500">Completed</div>
+            <div className="mt-1 font-mono text-xl text-command-green">
+              {agent.completedTaskCount}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded border border-command-line bg-black/25 p-3">
-          <div className="text-xs uppercase text-slate-500">Current task</div>
+          <div className="text-xs uppercase text-slate-500">
+            Current active task
+          </div>
           <p className="mt-1 min-h-10 text-sm text-slate-200">
             {agent.currentTask}
           </p>
@@ -96,6 +145,82 @@ export function AgentCard({ agent }: AgentCardProps) {
             <span className="font-mono font-semibold">
               {agent.cooldownRemaining}s
             </span>
+          </div>
+        )}
+
+        {(onAssignDiagnostic ||
+          onReduceRuntime ||
+          onRestoreRuntime ||
+          onSupervisionReset) && (
+          <div className="border-t border-command-line pt-3">
+            <div className="mb-2 text-xs uppercase text-slate-500">
+              Supervision controls
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {onAssignDiagnostic && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onAssignDiagnostic(agent.id)}
+                >
+                  Assign Diagnostic Task
+                </button>
+              )}
+              {onReduceRuntime && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onReduceRuntime(agent.id)}
+                >
+                  Reduce Runtime Quota by 10%
+                </button>
+              )}
+              {onRestoreRuntime && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onRestoreRuntime(agent.id)}
+                >
+                  Restore Runtime Quota
+                </button>
+              )}
+              {onSupervisionReset && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onSupervisionReset(agent.id)}
+                >
+                  Supervision Reset
+                </button>
+              )}
+              {agent.status === "COOLING_DOWN" && onEndCooldown && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onEndCooldown(agent.id)}
+                >
+                  End Cooldown
+                </button>
+              )}
+              {agent.status === "QUARANTINED" && onReleaseQuarantine && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onReleaseQuarantine(agent.id)}
+                >
+                  Release from Quarantine
+                </button>
+              )}
+              {agent.status === "QUARANTINED" && onFullReset && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onFullReset(agent.id)}
+                >
+                  Full Reset
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -3,10 +3,11 @@ import { getCommanderStats } from "../lib/simulation";
 import { StatCard } from "./StatCard";
 
 interface TopBarProps {
+  lastSavedAt: string | null;
   state: CommanderState;
 }
 
-export function TopBar({ state }: TopBarProps) {
+export function TopBar({ lastSavedAt, state }: TopBarProps) {
   const stats = getCommanderStats(state);
 
   return (
@@ -19,6 +20,9 @@ export function TopBar({ state }: TopBarProps) {
           <h1 className="mt-2 text-2xl font-semibold text-white md:text-3xl">
             Command Deck
           </h1>
+          <div className="mt-3 inline-flex rounded border border-command-line bg-black/25 px-3 py-1 font-mono text-xs text-slate-400">
+            STORAGE: LOCAL // LAST SAVE: {lastSavedAt ?? "UNSAVED"}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">

@@ -76,13 +76,13 @@ export function PenaltyProtocolPanel({ tasks }: PenaltyProtocolPanelProps) {
         <div className="rounded border border-command-line bg-black/25 p-3">
           <div className="text-xs uppercase text-slate-500">Retry</div>
           <div className="mt-1 font-mono text-xl text-command-amber">
-            {countStatus(tasks, "RETRY_REQUESTED")}
+            {countStatus(tasks, "RETRY_REQUIRED")}
           </div>
         </div>
         <div className="rounded border border-command-line bg-black/25 p-3">
           <div className="text-xs uppercase text-slate-500">Protocol</div>
           <div className="mt-1 font-mono text-xl text-command-red">
-            {countStatus(tasks, "PENALTY_PROTOCOL")}
+            {countStatus(tasks, "PENALTY_APPLIED")}
           </div>
         </div>
         <div className="rounded border border-command-line bg-black/25 p-3">
