@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useAgentRunner } from "../hooks/useAgentRunner";
 import { createAnalyticsSnapshot } from "../lib/analytics";
 import {
   addCampaignMission,
@@ -57,6 +58,7 @@ import type {
   TaskCreateInput,
 } from "../types";
 import { AgentCard } from "./AgentCard";
+import { AgentRunnerCard } from "./AgentRunnerCard";
 import { AnalyticsPanel } from "./analytics/AnalyticsPanel";
 import { TaskArchive } from "./archive/TaskArchive";
 import { CampaignsPanel } from "./campaigns/CampaignsPanel";
@@ -72,6 +74,7 @@ import { TaskQueue } from "./TaskQueue";
 import { TopBar } from "./TopBar";
 
 export function CommanderDashboard() {
+  const agentRunner = useAgentRunner();
   const [initialStorage] = useState(() => loadStorageState());
   const [state, setState] = useState<CommanderState>(
     () => initialStorage?.commanderState ?? createInitialCommanderState(),
@@ -372,6 +375,7 @@ export function CommanderDashboard() {
 
   const handleReset = () => {
     clearStorageState();
+    agentRunner.reset();
     setState(createInitialCommanderState());
     setSettings(DEFAULT_SIMULATION_SETTINGS);
     setCampaigns([]);
@@ -503,7 +507,19 @@ export function CommanderDashboard() {
     }
 
     if (activeSection === "AGENTS") {
-      return renderAgentGrid();
+      return (
+        <div className="space-y-5">
+          <AgentRunnerCard
+            config={agentRunner.config}
+            isStarting={agentRunner.isStarting}
+            provider={agentRunner.provider}
+            state={agentRunner.state}
+            onStart={agentRunner.start}
+            onStop={agentRunner.stop}
+          />
+          {renderAgentGrid()}
+        </div>
+      );
     }
 
     if (activeSection === "ARCHIVE") {
