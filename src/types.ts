@@ -166,6 +166,7 @@ export interface Task {
   priority: TaskPriority;
   difficulty: TaskDifficulty;
   assignedRoom: AssignedRoom;
+  assignedAgentId: string | null;
   status: TaskStatus;
   qualityScore: number | null;
   createdAt: string;

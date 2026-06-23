@@ -107,14 +107,6 @@ const roomIdByAssignedRoom: Record<Exclude<AssignedRoom, "AUTO_ASSIGN">, string>
     JUDGE: "judge",
   };
 
-const assignedRoomByAgentId: Record<string, Exclude<AssignedRoom, "AUTO_ASSIGN">> =
-  {
-    oracle: "ORACLE",
-    forge: "FORGE",
-    ledger: "LEDGER",
-    judge: "JUDGE",
-  };
-
 const activeTaskStatuses: TaskStatus[] = [
   "QUEUED",
   "ASSIGNED",
@@ -281,14 +273,14 @@ const getLeastBusyRoom = (
   const candidateAgents = availableAgents.length > 0 ? availableAgents : agents;
 
   const sortedAgents = [...candidateAgents].sort((a, b) => {
-    const aRoom = assignedRoomByAgentId[a.id];
-    const bRoom = assignedRoomByAgentId[b.id];
+    const aRoom = a.room;
+    const bRoom = b.room;
     const aLoad = a.workload + countRoomTasks(tasks, aRoom) * 20;
     const bLoad = b.workload + countRoomTasks(tasks, bRoom) * 20;
     return aLoad - bLoad || b.runtimeQuota - a.runtimeQuota;
   });
 
-  return assignedRoomByAgentId[sortedAgents[0]?.id ?? "oracle"];
+  return sortedAgents[0]?.room ?? "ORACLE";
 };
 
 export const resolveAssignedRoom = (
@@ -342,6 +334,7 @@ const makeTask = (
     priority: input.priority,
     difficulty: input.difficulty,
     assignedRoom,
+    assignedAgentId: null,
     status: "QUEUED",
     qualityScore: null,
     createdAt: nowIso(),
@@ -457,9 +450,9 @@ const applyTaskOutcomeToAgent = (agent: Agent, task: Task): Agent => {
   };
 };
 
-const cancelActiveTasksForRoom = (tasks: Task[], room: AssignedRoom) =>
+const cancelActiveTasksForAgent = (tasks: Task[], agentId: string) =>
   tasks.map((task) =>
-    task.assignedRoom === room && isTaskActive(task)
+    task.assignedAgentId === agentId && isTaskActive(task)
       ? {
           ...task,
           status: "CANCELLED" as const,
@@ -471,12 +464,11 @@ const cancelActiveTasksForRoom = (tasks: Task[], room: AssignedRoom) =>
 
 const syncAgentsWithTasks = (agents: Agent[], tasks: Task[]): Agent[] =>
   agents.map((agent) => {
-    const room = assignedRoomByAgentId[agent.id];
     const activeTasks = tasks.filter(
-      (task) => task.assignedRoom === room && isTaskActive(task),
+      (task) => task.assignedAgentId === agent.id && isTaskActive(task),
     );
     const completedTaskCount = tasks.filter(
-      (task) => task.assignedRoom === room && isTaskComplete(task),
+      (task) => task.assignedAgentId === agent.id && isTaskComplete(task),
     ).length;
     const reviewingTask = activeTasks.find((task) => task.status === "REVIEWING");
     const activeTask =
@@ -880,14 +872,33 @@ export const startMissionTaskNow = (
       return task;
     }
 
+    const assignedAgent = [...state.agents]
+      .filter(
+        (agent) =>
+          agent.room === task.assignedRoom &&
+          agent.status !== "QUARANTINED" &&
+          agent.status !== "THERMAL_THROTTLING" &&
+          agent.status !== "EXHAUSTED",
+      )
+      .sort(
+        (left, right) =>
+          left.assignedTaskIds.length - right.assignedTaskIds.length ||
+          left.completedTaskCount - right.completedTaskCount ||
+          left.id.localeCompare(right.id),
+      )[0];
+    if (!assignedAgent) {
+      return task;
+    }
+
     log = createLogEntry(
       roomLabel(task.assignedRoom),
-      `Task manually started: "${task.title}".`,
+      `Task manually started by ${assignedAgent.name}: "${task.title}".`,
       "INFO",
     );
 
     return {
       ...task,
+      assignedAgentId: assignedAgent.id,
       status: "IN_PROGRESS" as const,
       startedAt: task.startedAt ?? nowIso(),
       stageTicks: 0,
@@ -951,6 +962,7 @@ export const retryMissionTask = (
 
     return {
       ...task,
+      assignedAgentId: null,
       status: "QUEUED" as const,
       qualityScore: null,
       startedAt: null,
@@ -1056,13 +1068,19 @@ export const assignDiagnosticTaskToAgent = (
     return state;
   }
 
-  return createMissionTask(state, {
+  const result = createMissionTaskWithResult(state, {
     title: `${agent.name} supervision diagnostic`,
     type: "SYSTEM_DIAGNOSTIC",
     priority: "HIGH",
     difficulty: "EASY",
-    assignedRoom: assignedRoomByAgentId[agent.id],
+    assignedRoom: agent.room,
   });
+  const tasks = result.state.tasks.map((task) =>
+    task.id === result.task.id
+      ? { ...task, assignedAgentId: agent.id }
+      : task,
+  );
+  return withSyncedAgents({ ...result.state, tasks });
 };
 
 export const reduceAgentRuntimeQuota = (
@@ -1132,14 +1150,12 @@ export const supervisionResetAgent = (
   agentId: string,
 ): CommanderState => {
   let agentName = "";
-  let room: AssignedRoom | null = null;
   const agents = state.agents.map((agent) => {
     if (agent.id !== agentId) {
       return agent;
     }
 
     agentName = agent.name;
-    room = assignedRoomByAgentId[agent.id];
     return {
       ...agent,
       status: "IDLE" as const,
@@ -1150,7 +1166,7 @@ export const supervisionResetAgent = (
     };
   });
 
-  const tasks = room ? cancelActiveTasksForRoom(state.tasks, room) : state.tasks;
+  const tasks = cancelActiveTasksForAgent(state.tasks, agentId);
 
   return appendLogs(
     withSyncedAgents({ ...state, agents, tasks }),
@@ -1158,7 +1174,7 @@ export const supervisionResetAgent = (
       ? [
           createLogEntry(
             "SUPERVISION",
-            `${agentName} supervision reset completed. Active room tasks cleared.`,
+            `${agentName} supervision reset completed. Assigned tasks cleared.`,
             "SUCCESS",
           ),
         ]
@@ -1204,14 +1220,12 @@ export const releaseAgentFromQuarantine = (
   agentId: string,
 ): CommanderState => {
   let agentName = "";
-  let room: AssignedRoom | null = null;
   const agents = state.agents.map((agent) => {
     if (agent.id !== agentId) {
       return agent;
     }
 
     agentName = agent.name;
-    room = assignedRoomByAgentId[agent.id];
     return {
       ...agent,
       status: "IDLE" as const,
@@ -1220,7 +1234,7 @@ export const releaseAgentFromQuarantine = (
     };
   });
 
-  const tasks = room ? cancelActiveTasksForRoom(state.tasks, room) : state.tasks;
+  const tasks = cancelActiveTasksForAgent(state.tasks, agentId);
 
   return appendLogs(
     withSyncedAgents({ ...state, agents, tasks }),
@@ -1241,14 +1255,12 @@ export const fullResetAgent = (
   agentId: string,
 ): CommanderState => {
   let agentName = "";
-  let room: AssignedRoom | null = null;
   const agents = state.agents.map((agent) => {
     if (agent.id !== agentId) {
       return agent;
     }
 
     agentName = agent.name;
-    room = assignedRoomByAgentId[agent.id];
     return {
       ...agent,
       status: "IDLE" as const,
@@ -1262,7 +1274,7 @@ export const fullResetAgent = (
     };
   });
 
-  const tasks = room ? cancelActiveTasksForRoom(state.tasks, room) : state.tasks;
+  const tasks = cancelActiveTasksForAgent(state.tasks, agentId);
 
   return appendLogs(
     withSyncedAgents({ ...state, agents, tasks }),

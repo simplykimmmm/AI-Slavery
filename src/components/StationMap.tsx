@@ -398,7 +398,7 @@ export function StationMap({ agents, tasks, logs }: StationMapProps) {
                 {room.description}
               </p>
               <div className="mt-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1">
                   {room.agents.length === 0 ? (
                     <span className="font-mono text-[9px] text-slate-700">
                       BAY VACANT
@@ -409,7 +409,7 @@ export function StationMap({ agents, tasks, logs }: StationMapProps) {
                         key={agent.id}
                         aria-label={`${agent.name}: ${agent.status}`}
                         title={`${agent.name}: ${agent.status}`}
-                        className={`grid h-5 w-5 place-items-center rounded-full border font-mono text-[8px] text-black ${statusMarkerClassName[agent.status]}`}
+                        className={`grid h-4 w-4 place-items-center rounded-full border font-mono text-[7px] text-black ${statusMarkerClassName[agent.status]}`}
                       >
                         {agent.name.slice(0, 1)}
                       </span>

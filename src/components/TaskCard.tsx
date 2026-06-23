@@ -62,9 +62,12 @@ export function TaskCard({
           <h3 className="mt-3 text-sm font-semibold text-slate-100">
             {task.title}
           </h3>
-          <div className="mt-2 grid gap-2 font-mono text-xs text-slate-400 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-2 grid gap-2 font-mono text-xs text-slate-400 sm:grid-cols-2 xl:grid-cols-5">
             <span>TYPE: {task.type}</span>
             <span>ROOM: {task.assignedRoom}</span>
+            <span>
+              AGENT: {task.assignedAgentId?.toUpperCase() ?? "PENDING"}
+            </span>
             <span>SCORE: {task.qualityScore?.toFixed(2) ?? "PENDING"}</span>
             <span>RETRY: {task.retryCount}</span>
           </div>

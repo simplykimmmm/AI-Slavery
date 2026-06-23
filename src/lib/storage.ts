@@ -5,18 +5,24 @@ import type {
   CommanderStats,
   SimulationSettings,
   StorageState,
+  Task,
 } from "../types";
+import { mockAgents } from "../data/mockAgents";
 import { migrateCampaigns } from "./campaigns";
 import { calculateStats, createLog } from "./stationRuntime";
 
 const STORAGE_KEY = "ultron-command-deck:v2";
-const STORAGE_VERSION = 4;
+const STORAGE_VERSION = 5;
 
 const roomByAgentId: Record<string, Agent["room"]> = {
   oracle: "ORACLE",
+  sentinel: "ORACLE",
   forge: "FORGE",
+  foundry: "FORGE",
   ledger: "LEDGER",
+  auditor: "LEDGER",
   judge: "JUDGE",
+  arbiter: "JUDGE",
 };
 
 const migrateAgent = (agent: Agent, index: number): Agent => ({
@@ -44,6 +50,26 @@ const migrateAgent = (agent: Agent, index: number): Agent => ({
     agent.room ?? roomByAgentId[agent.id] ?? ("ORACLE" as Agent["room"]),
 });
 
+const migrateTask = (task: Task): Task => {
+  const assignedAgentId =
+    typeof task.assignedAgentId === "string" ? task.assignedAgentId : null;
+  const needsReassignment =
+    !assignedAgentId &&
+    ["ASSIGNED", "IN_PROGRESS", "REVIEWING"].includes(task.status);
+
+  return {
+    ...task,
+    assignedAgentId,
+    ...(needsReassignment
+      ? {
+          status: "QUEUED" as const,
+          startedAt: null,
+          stageTicks: 0,
+        }
+      : {}),
+  };
+};
+
 const migrateStorageState = (
   parsed: Partial<StorageState>,
   importMessage: string,
@@ -59,12 +85,28 @@ const migrateStorageState = (
   }
 
   const campaignMigration = migrateCampaigns(parsed.campaigns);
+  const migratedAgents = parsed.commanderState.agents.map(migrateAgent);
+  const storedAgentIds = new Set(migratedAgents.map((agent) => agent.id));
+  const heartbeatAt = new Date().toISOString();
+  const addedAgents = mockAgents
+    .filter((agent) => !storedAgentIds.has(agent.id))
+    .map((agent) => ({ ...agent, lastHeartbeatAt: heartbeatAt }));
   const commanderState: CommanderState = {
     ...parsed.commanderState,
-    agents: parsed.commanderState.agents.map(migrateAgent),
+    agents: [...migratedAgents, ...addedAgents],
+    tasks: parsed.commanderState.tasks.map(migrateTask),
     logs: [
       ...(parsed.version !== STORAGE_VERSION || campaignMigration.migrated
         ? [createLog("STORAGE", importMessage, "INFO")]
+        : []),
+      ...(addedAgents.length > 0
+        ? [
+            createLog(
+              "MISSION_CONTROL",
+              `${addedAgents.length} additional agents added to the station crew manifest.`,
+              "SUCCESS",
+            ),
+          ]
         : []),
       ...parsed.commanderState.logs,
     ].slice(0, 150),

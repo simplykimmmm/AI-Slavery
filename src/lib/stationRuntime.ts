@@ -212,9 +212,11 @@ const taskRoom = (task: Task): StationRoom =>
 const isAgentBlocked = (agent: Agent) =>
   BLOCKED_AGENT_STATUSES.includes(agent.status);
 
-const activeTasksForRoom = (tasks: Task[], room: StationRoom) =>
+const activeTasksForAgent = (tasks: Task[], agentId: string) =>
   tasks.filter(
-    (task) => taskRoom(task) === room && ACTIVE_TASK_STATUSES.includes(task.status),
+    (task) =>
+      task.assignedAgentId === agentId &&
+      ACTIVE_TASK_STATUSES.includes(task.status),
   );
 
 const syncAgentsWithTasks = (
@@ -223,10 +225,10 @@ const syncAgentsWithTasks = (
   heartbeatAt?: string,
 ) =>
   agents.map((agent) => {
-    const activeTasks = activeTasksForRoom(tasks, agent.room);
+    const activeTasks = activeTasksForAgent(tasks, agent.id);
     const completedTaskCount = tasks.filter(
       (task) =>
-        taskRoom(task) === agent.room &&
+        task.assignedAgentId === agent.id &&
         PROCESSED_TASK_STATUSES.includes(task.status) &&
         task.status !== "CANCELLED",
     ).length;
@@ -276,6 +278,7 @@ const createTaskFromInput = (
     input.assignedRoom === "AUTO_ASSIGN"
       ? ROOM_BY_TASK_TYPE[input.type]
       : input.assignedRoom,
+  assignedAgentId: null,
   status: "QUEUED",
   qualityScore: null,
   createdAt: timestamp,
@@ -336,7 +339,9 @@ export const assignQueuedTasks = (
       task.retryCount >= STATION_RUNTIME_CONSTANTS.maxRetries
     ) {
       const room = taskRoom(task);
-      const agentIndex = agents.findIndex((agent) => agent.room === room);
+      const agentIndex = agents.findIndex(
+        (agent) => agent.id === task.assignedAgentId,
+      );
       const agent = agents[agentIndex];
       if (agent) {
         agents[agentIndex] = {
@@ -349,7 +354,7 @@ export const assignQueuedTasks = (
       newLogs.push(
         createLog(
           room,
-          `Retry ceiling reached for "${task.title}"; room moved to technical quarantine.`,
+          `Retry ceiling reached for "${task.title}"; ${agent?.name ?? room} moved to technical quarantine.`,
           "CRITICAL",
           timestamp,
         ),
@@ -365,7 +370,12 @@ export const assignQueuedTasks = (
       task.status === "RETRY_REQUIRED" &&
       task.retryCount < STATION_RUNTIME_CONSTANTS.maxRetries
     ) {
-      task = { ...task, status: "QUEUED", stageTicks: 0 };
+      task = {
+        ...task,
+        assignedAgentId: null,
+        status: "QUEUED",
+        stageTicks: 0,
+      };
       newLogs.push(
         createLog(
           taskRoom(task),
@@ -381,20 +391,32 @@ export const assignQueuedTasks = (
     }
 
     const room = taskRoom(task);
-    const agentIndex = agents.findIndex((agent) => agent.room === room);
+    const candidateAgents = agents
+      .map((agent, index) => ({ agent, index }))
+      .filter(
+        ({ agent }) =>
+          agent.room === room &&
+          !isAgentBlocked(agent) &&
+          agent.runtimeQuota > STATION_RUNTIME_CONSTANTS.exhaustedQuotaAt &&
+          agent.assignedTaskIds.length < settings.maxActiveTasksPerAgent,
+      )
+      .sort(
+        (left, right) =>
+          left.agent.assignedTaskIds.length - right.agent.assignedTaskIds.length ||
+          left.agent.completedTaskCount - right.agent.completedTaskCount ||
+          left.agent.workload - right.agent.workload ||
+          left.agent.id.localeCompare(right.agent.id),
+      );
+    const agentIndex = candidateAgents[0]?.index ?? -1;
     const agent = agents[agentIndex];
-    if (
-      !agent ||
-      isAgentBlocked(agent) ||
-      agent.runtimeQuota <= STATION_RUNTIME_CONSTANTS.exhaustedQuotaAt ||
-      agent.assignedTaskIds.length >= settings.maxActiveTasksPerAgent
-    ) {
+    if (!agent) {
       return task;
     }
 
     const assignedTask = {
       ...task,
       assignedRoom: room,
+      assignedAgentId: agent.id,
       status: "ASSIGNED" as const,
       startedAt: task.startedAt ?? timestamp,
       stageTicks: 0,
@@ -408,7 +430,7 @@ export const assignQueuedTasks = (
     newLogs.push(
       createLog(
         room,
-        `Task assigned: "${task.title}".`,
+        `Task assigned to ${agent.name}: "${task.title}".`,
         "INFO",
         timestamp,
       ),
@@ -430,7 +452,9 @@ export const progressActiveTasks = (
       return task;
     }
 
-    const agent = state.agents.find((candidate) => candidate.room === taskRoom(task));
+    const agent = state.agents.find(
+      (candidate) => candidate.id === task.assignedAgentId,
+    );
     if (!agent || isAgentBlocked(agent)) {
       return task;
     }
@@ -439,7 +463,7 @@ export const progressActiveTasks = (
       newLogs.push(
         createLog(
           agent.room,
-          `Execution started: "${task.title}".`,
+          `${agent.name} started: "${task.title}".`,
           "INFO",
           timestamp,
         ),
@@ -460,7 +484,7 @@ export const progressActiveTasks = (
       newLogs.push(
         createLog(
           agent.room,
-          `Task progress ${Math.round((stageTicks / requiredTicks) * 100)}%: "${task.title}".`,
+          `${agent.name} progress ${Math.round((stageTicks / requiredTicks) * 100)}%: "${task.title}".`,
           "INFO",
           timestamp,
         ),
@@ -524,7 +548,7 @@ export const reviewCompletedTasks = (
     }
 
     const agentIndex = agents.findIndex(
-      (candidate) => candidate.room === taskRoom(task),
+      (candidate) => candidate.id === task.assignedAgentId,
     );
     const agent = agents[agentIndex];
     if (!agent) {
@@ -727,7 +751,7 @@ export const applyAgentVitals = (
 ): RuntimeStepResult => {
   const newLogs: LogEntry[] = [];
   const agents = state.agents.map((agent) => {
-    const activeTasks = activeTasksForRoom(state.tasks, agent.room);
+    const activeTasks = activeTasksForAgent(state.tasks, agent.id);
     if (isAgentBlocked(agent)) {
       return { ...agent, lastHeartbeatAt: timestamp };
     }
@@ -1163,8 +1187,15 @@ export const quarantineAgent = (
   }
   const timestamp = new Date().toISOString();
   const tasks = state.tasks.map((task) =>
-    taskRoom(task) === agent.room && ACTIVE_TASK_STATUSES.includes(task.status)
-      ? { ...task, status: "QUEUED" as const, stageTicks: 0, startedAt: null }
+    task.assignedAgentId === agent.id &&
+    ACTIVE_TASK_STATUSES.includes(task.status)
+      ? {
+          ...task,
+          assignedAgentId: null,
+          status: "QUEUED" as const,
+          stageTicks: 0,
+          startedAt: null,
+        }
       : task,
   );
   return appendLogs(

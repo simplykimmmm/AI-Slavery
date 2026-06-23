@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  assignQueuedTasks,
   calculateStats,
   createInitialCommanderState,
+  createStationTask,
   DEFAULT_STATION_SETTINGS,
   purgeCacheAndCoolRoom,
   tickStation,
@@ -20,12 +22,49 @@ describe("Station Runtime v1", () => {
     expect(first.state.tasks.every((task) => task.status === "IN_PROGRESS")).toBe(
       true,
     );
-    expect(first.state.agents.every((agent) => agent.totalTokensSpent > 0)).toBe(
-      true,
-    );
+    expect(first.state.agents).toHaveLength(30);
+    expect(
+      first.state.agents.reduce<Record<string, number>>((counts, agent) => {
+        counts[agent.room] = (counts[agent.room] ?? 0) + 1;
+        return counts;
+      }, {}),
+    ).toEqual({ ORACLE: 6, FORGE: 10, LEDGER: 6, JUDGE: 8 });
+    expect(
+      first.state.agents.filter((agent) => agent.totalTokensSpent > 0),
+    ).toHaveLength(4);
     expect(first.newLogs.some((log) => log.message.includes("Task assigned"))).toBe(
       true,
     );
+  });
+
+  it("distributes room tasks across the least-loaded eligible agents", () => {
+    const initial = createInitialCommanderState();
+    const withSecondTask = createStationTask(initial, {
+      title: "Verify secondary signal band",
+      type: "TREND_SCAN",
+      priority: "MEDIUM",
+      difficulty: "NORMAL",
+      assignedRoom: "ORACLE",
+    });
+    const withThirdTask = createStationTask(withSecondTask, {
+      title: "Compare anomaly clusters",
+      type: "MARKET_SIGNAL",
+      priority: "LOW",
+      difficulty: "EASY",
+      assignedRoom: "ORACLE",
+    });
+    const assigned = assignQueuedTasks(
+      withThirdTask,
+      DEFAULT_STATION_SETTINGS,
+    ).state;
+    const oracleAssignments = new Set(
+      assigned.tasks
+        .filter((task) => task.assignedRoom === "ORACLE")
+        .map((task) => task.assignedAgentId),
+    );
+
+    expect(oracleAssignments.size).toBe(3);
+    expect(oracleAssignments.has(null)).toBe(false);
   });
 
   it("moves tasks through review without crashing on empty arrays", () => {
