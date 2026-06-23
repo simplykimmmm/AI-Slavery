@@ -27,6 +27,13 @@ interface GroqCompletionResponse {
   error?: { message?: string };
 }
 
+interface AgentRuntimeEnvironment {
+  AGENT_STEP_INTERVAL_SECONDS?: string;
+  GROQ_API_KEY?: string;
+  GROQ_MAX_OUTPUT_TOKENS?: string;
+  GROQ_MODEL?: string;
+}
+
 export interface GroqRateLimitMetadata {
   requestLimit: number | null;
   requestsRemaining: number | null;
@@ -41,6 +48,13 @@ const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 const DEFAULT_MAX_OUTPUT_TOKENS = 256;
 const recentRequests = new Map<string, number>();
+
+const getRuntimeEnvironment = (): AgentRuntimeEnvironment =>
+  (
+    globalThis as typeof globalThis & {
+      process?: { env?: AgentRuntimeEnvironment };
+    }
+  ).process?.env ?? {};
 
 const readPositiveInteger = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
@@ -121,9 +135,10 @@ export const callGroqStep = async (
   task: string,
   fetchImplementation: typeof fetch = fetch,
 ) => {
-  const model = process.env.GROQ_MODEL?.trim() || DEFAULT_MODEL;
+  const environment = getRuntimeEnvironment();
+  const model = environment.GROQ_MODEL?.trim() || DEFAULT_MODEL;
   const maxTokens = readPositiveInteger(
-    process.env.GROQ_MAX_OUTPUT_TOKENS,
+    environment.GROQ_MAX_OUTPUT_TOKENS,
     DEFAULT_MAX_OUTPUT_TOKENS,
   );
   const groqResponse = await fetchImplementation(GROQ_API_URL, {
@@ -195,8 +210,9 @@ export default async function handler(
     return;
   }
 
-  const apiKey = process.env.GROQ_API_KEY?.trim();
-  const model = process.env.GROQ_MODEL?.trim() || DEFAULT_MODEL;
+  const environment = getRuntimeEnvironment();
+  const apiKey = environment.GROQ_API_KEY?.trim();
+  const model = environment.GROQ_MODEL?.trim() || DEFAULT_MODEL;
 
   if (request.method === "GET") {
     response.status(200).json({
@@ -248,7 +264,7 @@ export default async function handler(
   const clientId = getClientId(request);
   const now = Date.now();
   const minimumIntervalMs = readPositiveInteger(
-    process.env.AGENT_STEP_INTERVAL_SECONDS,
+    environment.AGENT_STEP_INTERVAL_SECONDS,
     5,
   ) * 900;
   const previousRequestAt = recentRequests.get(clientId) ?? 0;
