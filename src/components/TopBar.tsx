@@ -1,5 +1,5 @@
 import type { CommanderState } from "../types";
-import { getCommanderStats } from "../lib/simulation";
+import { calculateStats } from "../lib/stationRuntime";
 import { StatCard } from "./StatCard";
 
 interface TopBarProps {
@@ -8,7 +8,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ lastSavedAt, state }: TopBarProps) {
-  const stats = getCommanderStats(state);
+  const stats = calculateStats(state);
 
   return (
     <header className="rounded-lg border border-command-line bg-command-panel/85 p-4 shadow-panel backdrop-blur">

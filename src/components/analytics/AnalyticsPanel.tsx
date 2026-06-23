@@ -154,6 +154,50 @@ export function AnalyticsPanel({ snapshot }: AnalyticsPanelProps) {
           </div>
         </div>
 
+        <div className="rounded-lg border border-command-line bg-command-panel/80 p-4 shadow-panel backdrop-blur">
+          <h3 className="text-sm font-semibold uppercase text-slate-100">
+            Compute Heat Distribution
+          </h3>
+          <div className="mt-4 grid gap-3">
+            {snapshot.agentHeatLevels.map((item) => (
+              <MetricBar
+                key={item.agentName}
+                label={`${item.agentName} (${item.value}°C)`}
+                value={item.value}
+                tone={
+                  item.value >= 90
+                    ? "red"
+                    : item.value >= 75
+                      ? "amber"
+                      : "cyan"
+                }
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-command-line bg-command-panel/80 p-4 shadow-panel backdrop-blur">
+          <h3 className="text-sm font-semibold uppercase text-slate-100">
+            Efficiency Distribution
+          </h3>
+          <div className="mt-4 grid gap-3">
+            {snapshot.agentEfficiencyLevels.map((item) => (
+              <MetricBar
+                key={item.agentName}
+                label={item.agentName}
+                value={item.value}
+                tone={
+                  item.value >= 90
+                    ? "green"
+                    : item.value >= 65
+                      ? "amber"
+                      : "red"
+                }
+              />
+            ))}
+          </div>
+        </div>
+
         <div className="rounded-lg border border-command-line bg-command-panel/80 p-4 shadow-panel backdrop-blur xl:col-span-2">
           <h3 className="text-sm font-semibold uppercase text-slate-100">
             Campaign Status Distribution

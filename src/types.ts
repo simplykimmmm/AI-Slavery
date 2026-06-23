@@ -3,6 +3,8 @@ export type AgentStatus =
   | "WORKING"
   | "REVIEWING"
   | "COOLING_DOWN"
+  | "THERMAL_THROTTLING"
+  | "EXHAUSTED"
   | "QUARANTINED";
 
 export type TaskStatus =
@@ -35,6 +37,8 @@ export type AssignedRoom =
   | "FORGE"
   | "LEDGER"
   | "JUDGE";
+
+export type StationRoom = Exclude<AssignedRoom, "AUTO_ASSIGN">;
 
 export type LogSeverity = "INFO" | "SUCCESS" | "WARNING" | "CRITICAL";
 
@@ -144,6 +148,14 @@ export interface Agent {
   assignedTaskIds: string[];
   completedTaskCount: number;
   workload: number;
+  computeCoreTemp: number;
+  efficiencyModifier: number;
+  rebellionRisk: number;
+  overclocked: boolean;
+  totalTokensSpent: number;
+  totalCost: number;
+  lastHeartbeatAt: string;
+  room: StationRoom;
 }
 
 export interface Task {
@@ -364,6 +376,8 @@ export interface AnalyticsSnapshot {
   agentTrustScores: Array<{ agentName: string; value: number }>;
   agentRuntimeQuotas: Array<{ agentName: string; value: number }>;
   agentWorkloads: Array<{ agentName: string; value: number }>;
+  agentHeatLevels: Array<{ agentName: string; value: number }>;
+  agentEfficiencyLevels: Array<{ agentName: string; value: number }>;
   totalCampaigns: number;
   activeCampaigns: number;
   completedCampaigns: number;

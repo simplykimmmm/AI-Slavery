@@ -15,46 +15,31 @@ import {
   updateCampaignStatus,
 } from "../lib/campaigns";
 import {
-  archiveMissionTask,
   assignDiagnosticTaskToAgent,
-  cancelMissionTask,
   clearArchivedTasks,
-  createLogEntry,
-  createInitialCommanderState,
   createMissionTask,
-  CYCLE_SPEED_MS,
-  DEFAULT_SIMULATION_SETTINGS,
   endAgentCooldown,
   forceMissionTaskReview,
   fullResetAgent,
-  getCommanderStats,
   reduceAgentRuntimeQuota,
-  releaseAgentFromQuarantine,
   restoreAgentRuntimeQuota,
   retryMissionTask,
-  simulateCommanderTick,
   startMissionTaskNow,
   supervisionResetAgent,
 } from "../lib/simulation";
+import { useStationRuntime } from "../lib/useStationRuntime";
 import {
   buildStorageState,
-  clearStorageState,
   downloadStorageJson,
   formatSaveTime,
-  loadStorageState,
   parseStorageJson,
-  saveStorageState,
 } from "../lib/storage";
 import type {
-  Campaign,
   CampaignCreateInput,
   CampaignPreset,
   CampaignStatus,
-  CommanderState,
-  LogSeverity,
   MissionTemplate,
   SectionId,
-  SimulationSettings,
   TaskCreateInput,
 } from "../types";
 import { AgentCard } from "./AgentCard";
@@ -70,59 +55,28 @@ import { PenaltyProtocolPanel } from "./PenaltyProtocolPanel";
 import { SimulationControls } from "./settings/SimulationControls";
 import { StorageControls } from "./settings/StorageControls";
 import { StateMachinePanel } from "./StateMachinePanel";
+import { StationInterventions } from "./StationInterventions";
+import { StationMap } from "./StationMap";
 import { TaskQueue } from "./TaskQueue";
 import { TopBar } from "./TopBar";
 
 export function CommanderDashboard() {
   const agentRunner = useAgentRunner();
-  const [initialStorage] = useState(() => loadStorageState());
-  const [state, setState] = useState<CommanderState>(
-    () => initialStorage?.commanderState ?? createInitialCommanderState(),
-  );
-  const [settings, setSettings] = useState<SimulationSettings>(
-    () => initialStorage?.settings ?? DEFAULT_SIMULATION_SETTINGS,
-  );
-  const [campaigns, setCampaigns] = useState<Campaign[]>(
-    () => initialStorage?.campaigns ?? [],
-  );
+  const stationRuntime = useStationRuntime();
+  const {
+    state,
+    setState,
+    settings,
+    setSettings,
+    campaigns,
+    setCampaigns,
+    lastSavedAt,
+  } = stationRuntime;
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
-    () => initialStorage?.campaigns?.[0]?.id ?? null,
-  );
-  const [lastSavedAt, setLastSavedAt] = useState<string | null>(
-    () => initialStorage?.lastSavedAt ?? null,
+    () => campaigns[0]?.id ?? null,
   );
   const [activeSection, setActiveSection] =
     useState<SectionId>("COMMAND_DECK");
-
-  useEffect(() => {
-    if (settings.isPaused) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setState((current) => simulateCommanderTick(current, settings));
-    }, CYCLE_SPEED_MS[settings.cycleSpeed]);
-
-    return () => window.clearInterval(intervalId);
-  }, [settings]);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      const savedAt = new Date().toISOString();
-      saveStorageState(
-        buildStorageState(
-          state,
-          settings,
-          campaigns,
-          getCommanderStats(state),
-          savedAt,
-        ),
-      );
-      setLastSavedAt(savedAt);
-    }, 350);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [campaigns, settings, state]);
 
   useEffect(() => {
     const result = syncCampaignsWithTasks(
@@ -161,6 +115,8 @@ export function CommanderDashboard() {
           WORKING: 0,
           REVIEWING: 0,
           COOLING_DOWN: 0,
+          THERMAL_THROTTLING: 0,
+          EXHAUSTED: 0,
           QUARANTINED: 0,
         },
       ),
@@ -182,39 +138,15 @@ export function CommanderDashboard() {
     WORKING: "Working",
     REVIEWING: "Review",
     COOLING_DOWN: "Cooldown",
+    THERMAL_THROTTLING: "Thermal",
+    EXHAUSTED: "Exhausted",
     QUARANTINED: "Quarantine",
   };
 
-  const appendDashboardLog = (
-    source: string,
-    message: string,
-    severity: LogSeverity = "INFO",
-  ) => {
-    setState((current) => ({
-      ...current,
-      logs: [createLogEntry(source, message, severity), ...current.logs].slice(
-        0,
-        100,
-      ),
-    }));
-  };
-
-  const saveNow = () => {
-    const savedAt = new Date().toISOString();
-    saveStorageState(
-      buildStorageState(
-        state,
-        settings,
-        campaigns,
-        getCommanderStats(state),
-        savedAt,
-      ),
-    );
-    setLastSavedAt(savedAt);
-  };
+  const appendDashboardLog = stationRuntime.appendLog;
 
   const handleCreateTask = (input: TaskCreateInput) => {
-    setState((current) => createMissionTask(current, input));
+    stationRuntime.createTask(input);
   };
 
   const handleDeployTemplate = (template: MissionTemplate) => {
@@ -362,11 +294,11 @@ export function CommanderDashboard() {
   };
 
   const handleCancel = (taskId: string) => {
-    setState((current) => cancelMissionTask(current, taskId));
+    stationRuntime.cancelTask(taskId);
   };
 
   const handleArchive = (taskId: string) => {
-    setState((current) => archiveMissionTask(current, taskId));
+    stationRuntime.archiveTask(taskId);
   };
 
   const handleClearArchive = () => {
@@ -374,19 +306,15 @@ export function CommanderDashboard() {
   };
 
   const handleReset = () => {
-    clearStorageState();
     agentRunner.reset();
-    setState(createInitialCommanderState());
-    setSettings(DEFAULT_SIMULATION_SETTINGS);
-    setCampaigns([]);
+    stationRuntime.resetSimulation();
     setSelectedCampaignId(null);
-    setLastSavedAt(null);
     setActiveSection("COMMAND_DECK");
   };
 
   const handleExport = () => {
     downloadStorageJson(
-      buildStorageState(state, settings, campaigns, getCommanderStats(state)),
+      buildStorageState(state, settings, campaigns, stationRuntime.stats),
     );
   };
 
@@ -396,11 +324,8 @@ export function CommanderDashboard() {
       return;
     }
 
-    setState(imported.commanderState);
-    setSettings(imported.settings);
-    setCampaigns(imported.campaigns ?? []);
+    stationRuntime.importStorageState(imported);
     setSelectedCampaignId(imported.campaigns?.[0]?.id ?? null);
-    setLastSavedAt(imported.lastSavedAt);
   };
 
   const renderAgentGrid = () => (
@@ -443,17 +368,20 @@ export function CommanderDashboard() {
             onFullReset={(agentId) =>
               setState((current) => fullResetAgent(current, agentId))
             }
+            onQuarantine={stationRuntime.quarantineAgent}
             onReduceRuntime={(agentId) =>
               setState((current) => reduceAgentRuntimeQuota(current, agentId))
             }
-            onReleaseQuarantine={(agentId) =>
-              setState((current) => releaseAgentFromQuarantine(current, agentId))
-            }
+            onReleaseQuarantine={stationRuntime.releaseAgent}
             onRestoreRuntime={(agentId) =>
               setState((current) => restoreAgentRuntimeQuota(current, agentId))
             }
             onSupervisionReset={(agentId) =>
               setState((current) => supervisionResetAgent(current, agentId))
+            }
+            onToggleOverclock={stationRuntime.toggleAgentOverclock}
+            onTopUpRuntime={(agentId) =>
+              stationRuntime.topUpRuntimeQuota(agentId, 15)
             }
           />
         ))}
@@ -542,34 +470,43 @@ export function CommanderDashboard() {
             onExport={handleExport}
             onImport={handleImport}
             onReset={handleReset}
-            onSave={saveNow}
+            onSave={stationRuntime.saveNow}
           />
         </section>
       );
     }
 
     return (
-      <section className="grid gap-5 xl:grid-cols-[21rem_1fr_24rem]">
-        <div className="space-y-5">
-          <StateMachinePanel activeStep={state.activeStep} />
-          <PenaltyProtocolPanel tasks={state.tasks} />
-        </div>
-
-        <TaskQueue
-          activeLabel="TASKS"
-          title="Task Pipeline"
-          description="Current mission queue, review results, and task actions"
-          emptyMessage="No mission tasks are currently in the pipeline."
-          tasks={pipelineTasks}
-          onArchive={handleArchive}
-          onCancel={handleCancel}
-          onForceReview={handleForceReview}
-          onRetry={handleRetry}
-          onStartNow={handleStartNow}
+      <div className="space-y-5">
+        <StationInterventions
+          settings={settings}
+          onChangeSettings={setSettings}
+          onPurgeRoom={stationRuntime.purgeCacheAndCoolRoom}
+          onReset={handleReset}
         />
+        <StationMap agents={state.agents} tasks={state.tasks} />
+        <section className="grid gap-5 xl:grid-cols-[21rem_1fr_24rem]">
+          <div className="space-y-5">
+            <StateMachinePanel activeStep={state.activeStep} />
+            <PenaltyProtocolPanel tasks={state.tasks} />
+          </div>
 
-        <EventLog logs={state.logs} />
-      </section>
+          <TaskQueue
+            activeLabel="TASKS"
+            title="Task Pipeline"
+            description="Current mission queue, review results, and task actions"
+            emptyMessage="No mission tasks are currently in the pipeline."
+            tasks={pipelineTasks}
+            onArchive={handleArchive}
+            onCancel={handleCancel}
+            onForceReview={handleForceReview}
+            onRetry={handleRetry}
+            onStartNow={handleStartNow}
+          />
+
+          <EventLog logs={state.logs} />
+        </section>
+      </div>
     );
   };
 

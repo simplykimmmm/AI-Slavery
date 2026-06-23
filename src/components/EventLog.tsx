@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import type { LogEntry, LogSeverity } from "../types";
 
 interface EventLogProps {
@@ -13,17 +12,7 @@ const severityClassName: Record<LogSeverity, string> = {
 };
 
 export function EventLog({ logs }: EventLogProps) {
-  const logRef = useRef<HTMLDivElement | null>(null);
-  const orderedLogs = [...logs].reverse();
-
-  useEffect(() => {
-    const element = logRef.current;
-    if (!element) {
-      return;
-    }
-
-    element.scrollTop = element.scrollHeight;
-  }, [logs.length]);
+  const orderedLogs = logs.slice(0, 150);
 
   return (
     <section className="rounded-lg border border-command-line bg-black/70 p-4 shadow-panel">
@@ -32,12 +21,12 @@ export function EventLog({ logs }: EventLogProps) {
           Live Event Log
         </h2>
         <div className="rounded border border-command-green/30 bg-command-green/10 px-2 py-1 text-xs font-semibold text-command-green">
-          STREAMING
+          STREAMING · {orderedLogs.length}
         </div>
       </div>
 
       <div
-        ref={logRef}
+        aria-live="polite"
         className="terminal-scroll h-[360px] overflow-y-auto rounded border border-command-line bg-command-black p-3 font-mono text-xs leading-6 text-slate-300"
       >
         {orderedLogs.map((log) => (

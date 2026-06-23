@@ -1,4 +1,5 @@
 import type {
+  Agent,
   Campaign,
   CommanderState,
   CommanderStats,
@@ -6,10 +7,85 @@ import type {
   StorageState,
 } from "../types";
 import { migrateCampaigns } from "./campaigns";
-import { createLogEntry } from "./simulation";
+import { calculateStats, createLog } from "./stationRuntime";
 
 const STORAGE_KEY = "ultron-command-deck:v2";
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
+
+const roomByAgentId: Record<string, Agent["room"]> = {
+  oracle: "ORACLE",
+  forge: "FORGE",
+  ledger: "LEDGER",
+  judge: "JUDGE",
+};
+
+const migrateAgent = (agent: Agent, index: number): Agent => ({
+  ...agent,
+  computeCoreTemp:
+    typeof agent.computeCoreTemp === "number"
+      ? agent.computeCoreTemp
+      : 36 + index * 3,
+  efficiencyModifier:
+    typeof agent.efficiencyModifier === "number"
+      ? agent.efficiencyModifier
+      : 1,
+  rebellionRisk:
+    typeof agent.rebellionRisk === "number" ? agent.rebellionRisk : 0.08,
+  overclocked:
+    typeof agent.overclocked === "boolean" ? agent.overclocked : false,
+  totalTokensSpent:
+    typeof agent.totalTokensSpent === "number" ? agent.totalTokensSpent : 0,
+  totalCost: typeof agent.totalCost === "number" ? agent.totalCost : 0,
+  lastHeartbeatAt:
+    typeof agent.lastHeartbeatAt === "string"
+      ? agent.lastHeartbeatAt
+      : new Date().toISOString(),
+  room:
+    agent.room ?? roomByAgentId[agent.id] ?? ("ORACLE" as Agent["room"]),
+});
+
+const migrateStorageState = (
+  parsed: Partial<StorageState>,
+  importMessage: string,
+): StorageState | null => {
+  if (
+    !parsed.commanderState ||
+    !parsed.settings ||
+    !Array.isArray(parsed.commanderState.agents) ||
+    !Array.isArray(parsed.commanderState.tasks) ||
+    !Array.isArray(parsed.commanderState.logs)
+  ) {
+    return null;
+  }
+
+  const campaignMigration = migrateCampaigns(parsed.campaigns);
+  const commanderState: CommanderState = {
+    ...parsed.commanderState,
+    agents: parsed.commanderState.agents.map(migrateAgent),
+    logs: [
+      ...(parsed.version !== STORAGE_VERSION || campaignMigration.migrated
+        ? [createLog("STORAGE", importMessage, "INFO")]
+        : []),
+      ...parsed.commanderState.logs,
+    ].slice(0, 150),
+  };
+
+  return {
+    version: STORAGE_VERSION,
+    commanderState,
+    settings: {
+      ...parsed.settings,
+      isPaused: Boolean(parsed.settings.isPaused),
+      autoGenerateTasks:
+        parsed.version === STORAGE_VERSION
+          ? Boolean(parsed.settings.autoGenerateTasks)
+          : true,
+    },
+    campaigns: campaignMigration.campaigns,
+    stats: calculateStats(commanderState),
+    lastSavedAt: parsed.lastSavedAt ?? new Date().toISOString(),
+  };
+};
 
 export const formatSaveTime = (iso: string | null) => {
   if (!iso) {
@@ -52,32 +128,16 @@ export const loadStorageState = (): StorageState | null => {
 
   try {
     const parsed = JSON.parse(raw) as Partial<StorageState>;
-    if (!parsed.commanderState || !parsed.settings) {
-      return null;
+    const migrated = migrateStorageState(
+      parsed,
+      "Local storage migrated to Station Runtime v1.",
+    );
+    if (!migrated) {
+      window.localStorage.removeItem(STORAGE_KEY);
     }
-
-    const migrated = migrateCampaigns(parsed.campaigns);
-    const commanderState = parsed.commanderState as CommanderState;
-    const logs = migrated.migrated
-      ? [
-          createLogEntry(
-            "CAMPAIGN_CONTROL",
-            "Campaign storage migrated to typed operation plan schema.",
-            "INFO",
-          ),
-          ...(commanderState.logs ?? []),
-        ].slice(0, 100)
-      : commanderState.logs;
-
-    return {
-      ...parsed,
-      commanderState: {
-        ...commanderState,
-        logs,
-      },
-      campaigns: migrated.campaigns,
-    } as StorageState;
+    return migrated;
   } catch {
+    window.localStorage.removeItem(STORAGE_KEY);
     return null;
   }
 };
@@ -102,31 +162,10 @@ export const downloadStorageJson = (storageState: StorageState) => {
 export const parseStorageJson = (raw: string): StorageState | null => {
   try {
     const parsed = JSON.parse(raw) as Partial<StorageState>;
-    if (!parsed.commanderState || !parsed.settings) {
-      return null;
-    }
-
-    const migrated = migrateCampaigns(parsed.campaigns);
-    const commanderState = parsed.commanderState as CommanderState;
-    const logs = migrated.migrated
-      ? [
-          createLogEntry(
-            "CAMPAIGN_CONTROL",
-            "Imported campaign data migrated to typed operation plan schema.",
-            "INFO",
-          ),
-          ...(commanderState.logs ?? []),
-        ].slice(0, 100)
-      : commanderState.logs;
-
-    return {
-      ...parsed,
-      commanderState: {
-        ...commanderState,
-        logs,
-      },
-      campaigns: migrated.campaigns,
-    } as StorageState;
+    return migrateStorageState(
+      parsed,
+      "Imported storage migrated to Station Runtime v1.",
+    );
   } catch {
     return null;
   }

@@ -5,10 +5,13 @@ interface AgentCardProps {
   onAssignDiagnostic?: (agentId: string) => void;
   onEndCooldown?: (agentId: string) => void;
   onFullReset?: (agentId: string) => void;
+  onQuarantine?: (agentId: string) => void;
   onReduceRuntime?: (agentId: string) => void;
   onReleaseQuarantine?: (agentId: string) => void;
   onRestoreRuntime?: (agentId: string) => void;
   onSupervisionReset?: (agentId: string) => void;
+  onToggleOverclock?: (agentId: string) => void;
+  onTopUpRuntime?: (agentId: string) => void;
 }
 
 const statusClasses: Record<AgentStatus, string> = {
@@ -16,6 +19,9 @@ const statusClasses: Record<AgentStatus, string> = {
   WORKING: "border-command-cyan/40 bg-command-cyan/10 text-command-cyan",
   REVIEWING: "border-command-violet/40 bg-command-violet/10 text-command-violet",
   COOLING_DOWN: "border-command-amber/40 bg-command-amber/10 text-command-amber",
+  THERMAL_THROTTLING:
+    "border-command-red/40 bg-command-red/10 text-command-red",
+  EXHAUSTED: "border-slate-500/40 bg-slate-500/10 text-slate-300",
   QUARANTINED: "border-command-red/40 bg-command-red/10 text-command-red",
 };
 
@@ -43,12 +49,17 @@ export function AgentCard({
   onAssignDiagnostic,
   onEndCooldown,
   onFullReset,
+  onQuarantine,
   onReduceRuntime,
   onReleaseQuarantine,
   onRestoreRuntime,
   onSupervisionReset,
+  onToggleOverclock,
+  onTopUpRuntime,
 }: AgentCardProps) {
   const trustPercent = Math.round(agent.trustScore * 100);
+  const efficiencyPercent = Math.round(agent.efficiencyModifier * 100);
+  const deviationRiskPercent = Math.round(agent.rebellionRisk * 100);
 
   return (
     <article className="rounded-lg border border-command-line bg-command-panel/80 p-4 shadow-panel transition duration-300 hover:border-command-cyan/40 hover:bg-command-panel2/90">
@@ -77,6 +88,37 @@ export function AgentCard({
               className="h-full rounded bg-command-cyan transition-all duration-700"
               style={{ width: `${agent.runtimeQuota}%` }}
             />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Core temperature</span>
+              <span className={`font-mono ${agent.computeCoreTemp >= 90 ? "text-command-red" : agent.computeCoreTemp >= 75 ? "text-command-amber" : "text-command-cyan"}`}>
+                {agent.computeCoreTemp.toFixed(1)}°C
+              </span>
+            </div>
+            <div className="mt-2 h-2 rounded bg-black/50">
+              <div
+                className={`h-full rounded transition-all duration-700 ${agent.computeCoreTemp >= 90 ? "bg-command-red" : agent.computeCoreTemp >= 75 ? "bg-command-amber" : "bg-command-cyan"}`}
+                style={{ width: `${Math.min(agent.computeCoreTemp, 100)}%` }}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>Efficiency</span>
+              <span className="font-mono text-command-green">
+                {efficiencyPercent}%
+              </span>
+            </div>
+            <div className="mt-2 h-2 rounded bg-black/50">
+              <div
+                className="h-full rounded bg-command-green transition-all duration-700"
+                style={{ width: `${Math.min(efficiencyPercent, 100)}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -121,6 +163,33 @@ export function AgentCard({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="rounded border border-command-line bg-black/25 p-3">
+            <div className="uppercase text-slate-500">Token estimate</div>
+            <div className="mt-1 font-mono text-command-cyan">
+              {agent.totalTokensSpent.toLocaleString()}
+            </div>
+          </div>
+          <div className="rounded border border-command-line bg-black/25 p-3">
+            <div className="uppercase text-slate-500">Cost estimate</div>
+            <div className="mt-1 font-mono text-command-green">
+              ${agent.totalCost.toFixed(5)}
+            </div>
+          </div>
+          <div className="rounded border border-command-line bg-black/25 p-3">
+            <div className="uppercase text-slate-500">Deviation risk</div>
+            <div className="mt-1 font-mono text-command-amber">
+              {deviationRiskPercent}%
+            </div>
+          </div>
+          <div className="rounded border border-command-line bg-black/25 p-3">
+            <div className="uppercase text-slate-500">Overclock</div>
+            <div className={`mt-1 font-mono ${agent.overclocked ? "text-command-red" : "text-slate-400"}`}>
+              {agent.overclocked ? "ARMED" : "OFF"}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded border border-command-line bg-black/25 p-3">
           <div className="text-xs uppercase text-slate-500">
             Current active task
@@ -139,19 +208,28 @@ export function AgentCard({
           </span>
         </div>
 
-        {agent.status === "COOLING_DOWN" && (
+        {["COOLING_DOWN", "THERMAL_THROTTLING", "EXHAUSTED"].includes(
+          agent.status,
+        ) && (
           <div className="rounded border border-command-amber/30 bg-command-amber/10 p-3 text-sm text-command-amber">
-            Cooldown timer:{" "}
+            Recovery cycles:{" "}
             <span className="font-mono font-semibold">
-              {agent.cooldownRemaining}s
+              {agent.cooldownRemaining}
             </span>
           </div>
         )}
 
+        <div className="font-mono text-[10px] uppercase text-slate-600">
+          Heartbeat {new Date(agent.lastHeartbeatAt).toLocaleTimeString()}
+        </div>
+
         {(onAssignDiagnostic ||
+          onQuarantine ||
           onReduceRuntime ||
           onRestoreRuntime ||
-          onSupervisionReset) && (
+          onSupervisionReset ||
+          onToggleOverclock ||
+          onTopUpRuntime) && (
           <div className="border-t border-command-line pt-3">
             <div className="mb-2 text-xs uppercase text-slate-500">
               Supervision controls
@@ -182,6 +260,33 @@ export function AgentCard({
                   onClick={() => onRestoreRuntime(agent.id)}
                 >
                   Restore Runtime Quota
+                </button>
+              )}
+              {onTopUpRuntime && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onTopUpRuntime(agent.id)}
+                >
+                  Top Up Quota +15%
+                </button>
+              )}
+              {onToggleOverclock && agent.status !== "QUARANTINED" && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onToggleOverclock(agent.id)}
+                >
+                  {agent.overclocked ? "Disable Overclock" : "Enable Overclock"}
+                </button>
+              )}
+              {onQuarantine && agent.status !== "QUARANTINED" && (
+                <button
+                  type="button"
+                  className={actionButtonClassName}
+                  onClick={() => onQuarantine(agent.id)}
+                >
+                  Quarantine Agent
                 </button>
               )}
               {onSupervisionReset && (

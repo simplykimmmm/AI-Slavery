@@ -238,6 +238,14 @@ export const createAnalyticsSnapshot = (
       agentName: agent.name,
       value: agent.workload,
     })),
+    agentHeatLevels: state.agents.map((agent) => ({
+      agentName: agent.name,
+      value: Math.round(agent.computeCoreTemp),
+    })),
+    agentEfficiencyLevels: state.agents.map((agent) => ({
+      agentName: agent.name,
+      value: Math.round(agent.efficiencyModifier * 100),
+    })),
     totalCampaigns: campaigns.length,
     activeCampaigns: campaigns.filter((campaign) => campaign.status === "ACTIVE")
       .length,
