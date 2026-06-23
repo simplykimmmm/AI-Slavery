@@ -412,6 +412,16 @@ export function CommanderDashboard() {
       );
     }
 
+    if (activeSection === "STATION_MAP") {
+      return (
+        <StationMap
+          agents={state.agents}
+          tasks={state.tasks}
+          logs={state.logs}
+        />
+      );
+    }
+
     if (activeSection === "CAMPAIGNS") {
       return (
         <CampaignsPanel
@@ -483,8 +493,8 @@ export function CommanderDashboard() {
           onChangeSettings={setSettings}
           onPurgeRoom={stationRuntime.purgeCacheAndCoolRoom}
           onReset={handleReset}
+          onOpenStationMap={() => setActiveSection("STATION_MAP")}
         />
-        <StationMap agents={state.agents} tasks={state.tasks} />
         <section className="grid gap-5 xl:grid-cols-[21rem_1fr_24rem]">
           <div className="space-y-5">
             <StateMachinePanel activeStep={state.activeStep} />

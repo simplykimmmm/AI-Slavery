@@ -58,20 +58,75 @@ select {
   opacity: 0.72;
 }
 
-.command-grid::after {
-  position: fixed;
+.station-map-grid {
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.045) 1px, transparent 1px),
+    radial-gradient(circle at center, rgba(34, 211, 238, 0.045), transparent 55%);
+  background-size:
+    28px 28px,
+    28px 28px,
+    cover;
+}
+
+.station-map-crt {
+  position: relative;
+  isolation: isolate;
+}
+
+.station-map-crt::before,
+.station-map-crt::after {
+  position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: 30;
   pointer-events: none;
   content: "";
+}
+
+.station-map-crt::before {
   background: repeating-linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.028) 0,
-    rgba(255, 255, 255, 0.028) 1px,
+    rgba(255, 255, 255, 0.022) 0,
+    rgba(255, 255, 255, 0.022) 1px,
     transparent 1px,
-    transparent 7px
+    transparent 6px
   );
-  opacity: 0.28;
+  opacity: 0.32;
+}
+
+.station-map-crt::after {
+  background-image: radial-gradient(
+    circle at 25% 25%,
+    rgba(52, 211, 153, 0.06) 0,
+    transparent 1px
+  );
+  background-size: 5px 5px;
+  mix-blend-mode: screen;
+  opacity: 0.16;
+}
+
+.station-map-overclock {
+  animation: station-overclock-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes station-overclock-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(167, 139, 250, 0.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .station-map-overclock {
+    animation: none;
+  }
+
+  .station-map-packet {
+    display: none;
+  }
 }
 
 .terminal-scroll {

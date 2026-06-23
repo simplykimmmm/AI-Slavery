@@ -7,6 +7,7 @@ interface SectionTabsProps {
 
 const sections: Array<{ id: SectionId; label: string }> = [
   { id: "COMMAND_DECK", label: "Command Deck" },
+  { id: "STATION_MAP", label: "Station Map" },
   { id: "MISSIONS", label: "Missions" },
   { id: "CAMPAIGNS", label: "Campaigns" },
   { id: "AGENTS", label: "Agents" },
@@ -18,7 +19,7 @@ const sections: Array<{ id: SectionId; label: string }> = [
 export function SectionTabs({ activeSection, onChange }: SectionTabsProps) {
   return (
     <nav className="rounded-lg border border-command-line bg-command-panel/75 p-2 shadow-panel backdrop-blur">
-      <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-7">
+      <div className="grid gap-2 sm:grid-cols-4 xl:grid-cols-8">
         {sections.map((section) => {
           const isActive = section.id === activeSection;
 

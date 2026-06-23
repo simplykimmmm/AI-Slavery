@@ -48,6 +48,7 @@ export type QualityStrictness = "LENIENT" | "NORMAL" | "HARSH";
 
 export type SectionId =
   | "COMMAND_DECK"
+  | "STATION_MAP"
   | "MISSIONS"
   | "CAMPAIGNS"
   | "AGENTS"

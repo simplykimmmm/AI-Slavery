@@ -5,6 +5,7 @@ interface StationInterventionsProps {
   onChangeSettings: (settings: SimulationSettings) => void;
   onPurgeRoom: (room: StationRoom) => void;
   onReset: () => void;
+  onOpenStationMap?: () => void;
 }
 
 const rooms: StationRoom[] = ["ORACLE", "FORGE", "LEDGER", "JUDGE"];
@@ -17,6 +18,7 @@ export function StationInterventions({
   onChangeSettings,
   onPurgeRoom,
   onReset,
+  onOpenStationMap,
 }: StationInterventionsProps) {
   return (
     <section className="rounded-lg border border-command-violet/25 bg-command-panel/80 p-4 shadow-panel backdrop-blur">
@@ -31,6 +33,15 @@ export function StationInterventions({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onOpenStationMap && (
+            <button
+              type="button"
+              className={`${controlClassName} border-command-cyan/40 text-command-cyan`}
+              onClick={onOpenStationMap}
+            >
+              Open Station Map
+            </button>
+          )}
           <button
             type="button"
             className={`${controlClassName} ${settings.isPaused ? "border-command-green/50 text-command-green" : "border-command-amber/50 text-command-amber"}`}
