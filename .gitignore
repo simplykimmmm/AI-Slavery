@@ -1,9 +1,13 @@
-node_modules
-dist
+node_modules/
+server/node_modules/
+dist/
+server/dist/
 .env
 .env.*
 !.env.example
+.local
 *.local
+.runtime-artifacts/
 *.log
 *.err
 

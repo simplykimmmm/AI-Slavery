@@ -28,7 +28,7 @@ export function StationInterventions({
             STATION COMMANDER INTERVENTIONS
           </div>
           <p className="mt-1 text-sm text-slate-400">
-            Reversible browser-local quality-control actions.
+            Reversible technical quality-control actions with live-backend fallback.
           </p>
         </div>
 

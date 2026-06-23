@@ -1,13 +1,16 @@
 import type { CommanderState } from "../types";
 import { calculateStats } from "../lib/stationRuntime";
 import { StatCard } from "./StatCard";
+import type { BackendConnectionStatus, RuntimeMode } from "../lib/useLiveStationRuntime";
 
 interface TopBarProps {
   lastSavedAt: string | null;
   state: CommanderState;
+  connectionStatus: BackendConnectionStatus;
+  runtimeMode: RuntimeMode;
 }
 
-export function TopBar({ lastSavedAt, state }: TopBarProps) {
+export function TopBar({ lastSavedAt, state, connectionStatus, runtimeMode }: TopBarProps) {
   const stats = calculateStats(state);
 
   return (
@@ -20,8 +23,16 @@ export function TopBar({ lastSavedAt, state }: TopBarProps) {
           <h1 className="mt-2 text-2xl font-semibold text-white md:text-3xl">
             Command Deck
           </h1>
-          <div className="mt-3 inline-flex rounded border border-command-line bg-black/25 px-3 py-1 font-mono text-xs text-slate-400">
-            STORAGE: LOCAL // LAST SAVE: {lastSavedAt ?? "UNSAVED"}
+          <div className="mt-3 flex flex-wrap gap-2 font-mono text-xs">
+            <span className={`rounded border px-3 py-1 ${connectionStatus === "LIVE" ? "border-command-green/40 bg-command-green/10 text-command-green" : connectionStatus === "RECONNECTING" ? "border-command-amber/40 bg-command-amber/10 text-command-amber" : "border-command-red/40 bg-command-red/10 text-command-red"}`}>
+              CONNECTION: {connectionStatus}
+            </span>
+            <span className={`rounded border px-3 py-1 ${runtimeMode === "BACKEND" ? "border-command-cyan/40 bg-command-cyan/10 text-command-cyan" : "border-command-amber/50 bg-command-amber/10 text-command-amber"}`}>
+              {runtimeMode === "BACKEND" ? "PERSISTENT BACKEND MODE" : "LOCAL SIMULATION MODE"}
+            </span>
+            <span className="rounded border border-command-line bg-black/25 px-3 py-1 text-slate-400">
+              LAST LOCAL SAVE: {lastSavedAt ?? "UNSAVED"}
+            </span>
           </div>
         </div>
 

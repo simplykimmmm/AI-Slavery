@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_API_URL?: string;
   readonly AGENT_MAX_RUNTIME_SECONDS?: string;
   readonly AGENT_COOLDOWN_SECONDS?: string;
   readonly AGENT_STEP_INTERVAL_SECONDS?: string;

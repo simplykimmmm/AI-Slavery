@@ -5,14 +5,30 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:frontend": "vite",
+    "dev:backend": "npm --prefix server run dev",
+    "dev:worker": "npm --prefix server run worker:dev",
+    "dev:all": "concurrently -n frontend,backend,worker -c cyan,violet,amber \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:worker\"",
+    "backend:install": "npm --prefix server install",
+    "backend:build": "npm --prefix server run build",
+    "backend:typecheck": "npm --prefix server run typecheck",
+    "backend:test": "npm --prefix server run test",
+    "db:generate": "npm --prefix server run db:generate",
+    "db:migrate": "npm --prefix server run db:migrate",
+    "db:push": "npm --prefix server run db:push",
+    "db:seed": "npm --prefix server run db:seed",
+    "stack:up": "docker compose up -d postgres redis",
+    "stack:down": "docker compose down",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
@@ -20,7 +36,9 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.0",
+    "concurrently": "^9.2.1",
     "postcss": "^8.5.15",
+    "prisma": "^6.19.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

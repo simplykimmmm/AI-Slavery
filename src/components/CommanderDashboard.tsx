@@ -17,7 +17,6 @@ import {
 import {
   assignDiagnosticTaskToAgent,
   clearArchivedTasks,
-  createMissionTask,
   endAgentCooldown,
   forceMissionTaskReview,
   fullResetAgent,
@@ -27,7 +26,7 @@ import {
   startMissionTaskNow,
   supervisionResetAgent,
 } from "../lib/simulation";
-import { useStationRuntime } from "../lib/useStationRuntime";
+import { useLiveStationRuntime } from "../lib/useLiveStationRuntime";
 import {
   buildStorageState,
   downloadStorageJson,
@@ -62,7 +61,7 @@ import { TopBar } from "./TopBar";
 
 export function CommanderDashboard() {
   const agentRunner = useAgentRunner();
-  const stationRuntime = useStationRuntime();
+  const stationRuntime = useLiveStationRuntime();
   const {
     state,
     setState,
@@ -71,6 +70,8 @@ export function CommanderDashboard() {
     campaigns,
     setCampaigns,
     lastSavedAt,
+    connectionStatus,
+    runtimeMode,
   } = stationRuntime;
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
     () => campaigns[0]?.id ?? null,
@@ -150,12 +151,7 @@ export function CommanderDashboard() {
   };
 
   const handleDeployTemplate = (template: MissionTemplate) => {
-    setState((current) =>
-      createMissionTask(current, {
-        ...template.task,
-        title: template.name,
-      }),
-    );
+    stationRuntime.createTask({ ...template.task, title: template.name });
   };
 
   const handleCreateCampaign = (input: CampaignCreateInput) => {
@@ -282,15 +278,27 @@ export function CommanderDashboard() {
   };
 
   const handleStartNow = (taskId: string) => {
-    setState((current) => startMissionTaskNow(current, taskId));
+    if (runtimeMode === "BACKEND") {
+      stationRuntime.patchTask(taskId, { status: "IN_PROGRESS", startedAt: new Date().toISOString() });
+    } else {
+      setState((current) => startMissionTaskNow(current, taskId));
+    }
   };
 
   const handleForceReview = (taskId: string) => {
-    setState((current) => forceMissionTaskReview(current, taskId));
+    if (runtimeMode === "BACKEND") {
+      stationRuntime.patchTask(taskId, { status: "REVIEWING" });
+    } else {
+      setState((current) => forceMissionTaskReview(current, taskId));
+    }
   };
 
   const handleRetry = (taskId: string) => {
-    setState((current) => retryMissionTask(current, taskId));
+    if (runtimeMode === "BACKEND") {
+      stationRuntime.patchTask(taskId, { status: "QUEUED", assignedAgentId: null });
+    } else {
+      setState((current) => retryMissionTask(current, taskId));
+    }
   };
 
   const handleCancel = (taskId: string) => {
@@ -359,26 +367,29 @@ export function CommanderDashboard() {
           <AgentCard
             key={agent.id}
             agent={agent}
-            onAssignDiagnostic={(agentId) =>
-              setState((current) => assignDiagnosticTaskToAgent(current, agentId))
-            }
-            onEndCooldown={(agentId) =>
-              setState((current) => endAgentCooldown(current, agentId))
-            }
-            onFullReset={(agentId) =>
-              setState((current) => fullResetAgent(current, agentId))
-            }
+            onAssignDiagnostic={(agentId) => {
+              if (runtimeMode === "BACKEND") {
+                const selected = state.agents.find((candidate) => candidate.id === agentId);
+                if (selected) stationRuntime.createTask({ title: `${selected.name} supervision diagnostic`, type: "SYSTEM_DIAGNOSTIC", priority: "HIGH", difficulty: "EASY", assignedRoom: selected.room });
+              } else setState((current) => assignDiagnosticTaskToAgent(current, agentId));
+            }}
+            onEndCooldown={(agentId) => runtimeMode === "BACKEND"
+              ? stationRuntime.patchAgent(agentId, { status: "IDLE", cooldownRemaining: 0 })
+              : setState((current) => endAgentCooldown(current, agentId))}
+            onFullReset={(agentId) => runtimeMode === "BACKEND"
+              ? stationRuntime.patchAgent(agentId, { status: "IDLE", runtimeQuota: 100, trustScore: 0.86, cooldownRemaining: 0, overclocked: false })
+              : setState((current) => fullResetAgent(current, agentId))}
             onQuarantine={stationRuntime.quarantineAgent}
-            onReduceRuntime={(agentId) =>
-              setState((current) => reduceAgentRuntimeQuota(current, agentId))
-            }
+            onReduceRuntime={(agentId) => runtimeMode === "BACKEND"
+              ? stationRuntime.patchAgent(agentId, { runtimeQuota: Math.max(0, agent.runtimeQuota - 10) })
+              : setState((current) => reduceAgentRuntimeQuota(current, agentId))}
             onReleaseQuarantine={stationRuntime.releaseAgent}
-            onRestoreRuntime={(agentId) =>
-              setState((current) => restoreAgentRuntimeQuota(current, agentId))
-            }
-            onSupervisionReset={(agentId) =>
-              setState((current) => supervisionResetAgent(current, agentId))
-            }
+            onRestoreRuntime={(agentId) => runtimeMode === "BACKEND"
+              ? stationRuntime.patchAgent(agentId, { runtimeQuota: 100 })
+              : setState((current) => restoreAgentRuntimeQuota(current, agentId))}
+            onSupervisionReset={(agentId) => runtimeMode === "BACKEND"
+              ? stationRuntime.patchAgent(agentId, { status: "IDLE", cooldownRemaining: 0, overclocked: false })
+              : setState((current) => supervisionResetAgent(current, agentId))}
             onToggleOverclock={stationRuntime.toggleAgentOverclock}
             onTopUpRuntime={(agentId) =>
               stationRuntime.topUpRuntimeQuota(agentId, 15)
@@ -523,7 +534,12 @@ export function CommanderDashboard() {
   return (
     <main className="command-grid min-h-screen bg-command-black px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1600px] flex-col gap-5">
-        <TopBar state={state} lastSavedAt={formatSaveTime(lastSavedAt)} />
+        <TopBar
+          state={state}
+          lastSavedAt={formatSaveTime(lastSavedAt)}
+          connectionStatus={connectionStatus}
+          runtimeMode={runtimeMode}
+        />
         <SectionTabs activeSection={activeSection} onChange={setActiveSection} />
         {renderSection()}
       </div>

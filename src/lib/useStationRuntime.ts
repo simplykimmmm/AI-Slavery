@@ -42,7 +42,7 @@ const initialRuntime = () => {
   };
 };
 
-export function useStationRuntime() {
+export function useStationRuntime(options: { externalRuntime?: boolean } = {}) {
   const [initial] = useState(initialRuntime);
   const [state, setState] = useState<CommanderState>(initial.state);
   const [settings, setSettingsState] = useState<SimulationSettings>(
@@ -56,7 +56,7 @@ export function useStationRuntime() {
   const stats = useMemo(() => calculateStats(state), [state]);
 
   useEffect(() => {
-    if (settings.isPaused) {
+    if (settings.isPaused || options.externalRuntime) {
       return;
     }
 
@@ -65,9 +65,12 @@ export function useStationRuntime() {
     }, STATION_RUNTIME_CONSTANTS.cycleSpeedMs[settings.cycleSpeed]);
 
     return () => window.clearInterval(intervalId);
-  }, [settings]);
+  }, [options.externalRuntime, settings]);
 
   useEffect(() => {
+    if (options.externalRuntime) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       const savedAt = new Date().toISOString();
       saveStorageState(
@@ -77,7 +80,7 @@ export function useStationRuntime() {
     }, 300);
 
     return () => window.clearTimeout(timeoutId);
-  }, [campaigns, settings, state, stats]);
+  }, [campaigns, options.externalRuntime, settings, state, stats]);
 
   const appendLog = useCallback(
     (

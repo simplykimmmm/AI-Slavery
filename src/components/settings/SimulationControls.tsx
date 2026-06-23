@@ -25,7 +25,7 @@ export function SimulationControls({
           Simulation Control
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Local runtime behavior for the commander loop and task pipeline.
+          Runtime behavior for the persistent backend or local fallback loop.
         </p>
       </div>
 

@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Room {
+  ORACLE
+  FORGE
+  LEDGER
+  JUDGE
+  COMMAND
+}
+
+enum AgentStatus {
+  IDLE
+  WORKING
+  REVIEWING
+  COOLING_DOWN
+  THERMAL_THROTTLING
+  EXHAUSTED
+  QUARANTINED
+}
+
+enum TaskStatus {
+  QUEUED
+  ASSIGNED
+  IN_PROGRESS
+  REVIEWING
+  ACCEPTED
+  RETRY_REQUIRED
+  PENALTY_APPLIED
+  QUARANTINED
+  FAILED
+  CANCELLED
+}
+
+enum LogSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+}
+
+model Agent {
+  id                   String      @id
+  name                 String      @unique
+  role                 String
+  room                 Room
+  status               AgentStatus @default(IDLE)
+  runtimeQuota         Float       @default(100)
+  trustScore           Float       @default(0.85)
+  computeCoreTemp      Float       @default(35)
+  efficiencyModifier   Float       @default(1)
+  rebellionRisk        Float       @default(0.05)
+  overclocked          Boolean     @default(false)
+  currentTaskId        String?
+  cooldownRemaining    Int         @default(0)
+  workload             Float       @default(0)
+  totalTokensSpent     Int         @default(0)
+  totalCost            Float       @default(0)
+  completedTaskCount   Int         @default(0)
+  lastOutputScore      Float?
+  lastHeartbeatAt      DateTime    @default(now())
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  tasks                Task[]
+  costEntries          CostLedgerEntry[]
+}
+
+model Task {
+  id              String      @id @default(cuid())
+  title           String
+  type            String
+  priority        String
+  difficulty      String
+  assignedRoom    Room
+  status          TaskStatus  @default(QUEUED)
+  qualityScore    Float?
+  retryCount      Int         @default(0)
+  stageTicks      Int         @default(0)
+  archived        Boolean     @default(false)
+  payload         Json
+  result          Json?
+  assignedAgentId String?
+  assignedAgent   Agent?      @relation(fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  updatedAt       DateTime    @updatedAt
+  costEntries     CostLedgerEntry[]
+
+  @@index([status, archived])
+  @@index([assignedAgentId])
+}
+
+model LogEntry {
+  id        String      @id @default(cuid())
+  timestamp DateTime    @default(now())
+  source    String
+  message   String
+  severity  LogSeverity @default(INFO)
+  metadata  Json?
+
+  @@index([timestamp])
+}
+
+model RuntimeEvent {
+  id        String   @id @default(cuid())
+  type      String
+  source    String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model CostLedgerEntry {
+  id            String   @id @default(cuid())
+  agentId       String?
+  taskId        String?
+  agent         Agent?   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  task          Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  provider      String
+  model         String
+  inputTokens   Int
+  outputTokens  Int
+  estimatedCost Float
+  createdAt     DateTime @default(now())
+
+  @@index([agentId])
+  @@index([taskId])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  type        String
+  doctrine    String
+  riskLevel   String
+  status      String
+  objectives  Json
+  missions    Json
+  reports     Json
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime @updatedAt
+}
+
+model SystemState {
+  id                   String   @id @default("singleton")
+  cycleCount           Int      @default(0)
+  systemStatus         String   @default("ONLINE")
+  isPaused             Boolean  @default(false)
+  cycleSpeed           String   @default("NORMAL")
+  autoProcessTasks     Boolean  @default(true)
+  autoGenerateTasks    Boolean  @default(false)
+  qualityStrictness    String   @default("NORMAL")
+  maxActiveTasksPerAgent Int    @default(2)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
