@@ -46,6 +46,24 @@ Set `VITE_API_URL=http://localhost:4000` during local development, or set it to 
 
 The existing Vercel frontend remains a normal static Vite build. PostgreSQL, Redis, the Socket.io backend, and the long-running worker must run on infrastructure that supports persistent Node services; Vercel only needs the public `VITE_API_URL` for this integration.
 
+## Supabase persistence and Realtime
+
+Supabase is the preferred frontend persistence layer when both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. If either value is absent, the dashboard displays a warning and continues with Backend Runtime v1 or its browser-local simulation.
+
+1. Create a Supabase project.
+2. Open its SQL Editor and run [`supabase/schema.sql`](supabase/schema.sql). This creates the agent/task/log/metric/penalty/ledger tables, development RLS policies, Realtime publication entries, triggers, and four seed agents.
+3. In Database → Publications, confirm `agents`, `tasks`, and `agent_logs` are enabled for `supabase_realtime` (the schema script also attempts this automatically).
+4. Copy `.env.example` to `.env`, then set:
+
+   ```text
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+5. Run `npm install` and `npm run dev`.
+
+For Vercel, add the same two `VITE_` variables to the project and redeploy. These values are intended for browser use; never expose the Supabase service-role key. The included anonymous/authenticated policies are deliberately permissive for development and must be replaced with user or team ownership policies before production.
+
 ## Commands
 
 - `npm run typecheck`, `npm test`, `npm run build` — frontend validation

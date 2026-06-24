@@ -72,6 +72,7 @@ export function CommanderDashboard() {
     lastSavedAt,
     connectionStatus,
     runtimeMode,
+    supabaseStatus,
   } = stationRuntime;
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(
     () => campaigns[0]?.id ?? null,
@@ -278,7 +279,7 @@ export function CommanderDashboard() {
   };
 
   const handleStartNow = (taskId: string) => {
-    if (runtimeMode === "BACKEND") {
+    if (runtimeMode !== "LOCAL_SIMULATION") {
       stationRuntime.patchTask(taskId, { status: "IN_PROGRESS", startedAt: new Date().toISOString() });
     } else {
       setState((current) => startMissionTaskNow(current, taskId));
@@ -286,7 +287,7 @@ export function CommanderDashboard() {
   };
 
   const handleForceReview = (taskId: string) => {
-    if (runtimeMode === "BACKEND") {
+    if (runtimeMode !== "LOCAL_SIMULATION") {
       stationRuntime.patchTask(taskId, { status: "REVIEWING" });
     } else {
       setState((current) => forceMissionTaskReview(current, taskId));
@@ -294,7 +295,7 @@ export function CommanderDashboard() {
   };
 
   const handleRetry = (taskId: string) => {
-    if (runtimeMode === "BACKEND") {
+    if (runtimeMode !== "LOCAL_SIMULATION") {
       stationRuntime.patchTask(taskId, { status: "QUEUED", assignedAgentId: null });
     } else {
       setState((current) => retryMissionTask(current, taskId));
@@ -310,7 +311,11 @@ export function CommanderDashboard() {
   };
 
   const handleClearArchive = () => {
-    setState((current) => clearArchivedTasks(current));
+    if (runtimeMode === "SUPABASE") {
+      stationRuntime.clearArchivedTasks();
+    } else {
+      setState((current) => clearArchivedTasks(current));
+    }
   };
 
   const handleReset = () => {
@@ -368,26 +373,26 @@ export function CommanderDashboard() {
             key={agent.id}
             agent={agent}
             onAssignDiagnostic={(agentId) => {
-              if (runtimeMode === "BACKEND") {
+              if (runtimeMode !== "LOCAL_SIMULATION") {
                 const selected = state.agents.find((candidate) => candidate.id === agentId);
                 if (selected) stationRuntime.createTask({ title: `${selected.name} supervision diagnostic`, type: "SYSTEM_DIAGNOSTIC", priority: "HIGH", difficulty: "EASY", assignedRoom: selected.room });
               } else setState((current) => assignDiagnosticTaskToAgent(current, agentId));
             }}
-            onEndCooldown={(agentId) => runtimeMode === "BACKEND"
+            onEndCooldown={(agentId) => runtimeMode !== "LOCAL_SIMULATION"
               ? stationRuntime.patchAgent(agentId, { status: "IDLE", cooldownRemaining: 0 })
               : setState((current) => endAgentCooldown(current, agentId))}
-            onFullReset={(agentId) => runtimeMode === "BACKEND"
-              ? stationRuntime.patchAgent(agentId, { status: "IDLE", runtimeQuota: 100, trustScore: 0.86, cooldownRemaining: 0, overclocked: false })
+            onFullReset={(agentId) => runtimeMode !== "LOCAL_SIMULATION"
+              ? stationRuntime.resetAgent(agentId)
               : setState((current) => fullResetAgent(current, agentId))}
             onQuarantine={stationRuntime.quarantineAgent}
-            onReduceRuntime={(agentId) => runtimeMode === "BACKEND"
+            onReduceRuntime={(agentId) => runtimeMode !== "LOCAL_SIMULATION"
               ? stationRuntime.patchAgent(agentId, { runtimeQuota: Math.max(0, agent.runtimeQuota - 10) })
               : setState((current) => reduceAgentRuntimeQuota(current, agentId))}
             onReleaseQuarantine={stationRuntime.releaseAgent}
-            onRestoreRuntime={(agentId) => runtimeMode === "BACKEND"
+            onRestoreRuntime={(agentId) => runtimeMode !== "LOCAL_SIMULATION"
               ? stationRuntime.patchAgent(agentId, { runtimeQuota: 100 })
               : setState((current) => restoreAgentRuntimeQuota(current, agentId))}
-            onSupervisionReset={(agentId) => runtimeMode === "BACKEND"
+            onSupervisionReset={(agentId) => runtimeMode !== "LOCAL_SIMULATION"
               ? stationRuntime.patchAgent(agentId, { status: "IDLE", cooldownRemaining: 0, overclocked: false })
               : setState((current) => supervisionResetAgent(current, agentId))}
             onToggleOverclock={stationRuntime.toggleAgentOverclock}
@@ -540,6 +545,21 @@ export function CommanderDashboard() {
           connectionStatus={connectionStatus}
           runtimeMode={runtimeMode}
         />
+        {!supabaseStatus.configured && (
+          <div className="rounded border border-command-amber/40 bg-command-amber/10 px-4 py-2 text-sm text-command-amber">
+            Supabase is not configured. The dashboard is using its backend or local simulation fallback.
+          </div>
+        )}
+        {supabaseStatus.configured && supabaseStatus.loading && (
+          <div className="rounded border border-command-cyan/40 bg-command-cyan/10 px-4 py-2 text-sm text-command-cyan">
+            Connecting to Supabase realtime state…
+          </div>
+        )}
+        {supabaseStatus.configured && supabaseStatus.error && (
+          <div className="rounded border border-command-red/40 bg-command-red/10 px-4 py-2 text-sm text-command-red">
+            Supabase connection failed: {supabaseStatus.error}. Local simulation fallback remains available.
+          </div>
+        )}
         <SectionTabs activeSection={activeSection} onChange={setActiveSection} />
         {renderSection()}
       </div>

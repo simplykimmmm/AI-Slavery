@@ -27,8 +27,8 @@ export function TopBar({ lastSavedAt, state, connectionStatus, runtimeMode }: To
             <span className={`rounded border px-3 py-1 ${connectionStatus === "LIVE" ? "border-command-green/40 bg-command-green/10 text-command-green" : connectionStatus === "RECONNECTING" ? "border-command-amber/40 bg-command-amber/10 text-command-amber" : "border-command-red/40 bg-command-red/10 text-command-red"}`}>
               CONNECTION: {connectionStatus}
             </span>
-            <span className={`rounded border px-3 py-1 ${runtimeMode === "BACKEND" ? "border-command-cyan/40 bg-command-cyan/10 text-command-cyan" : "border-command-amber/50 bg-command-amber/10 text-command-amber"}`}>
-              {runtimeMode === "BACKEND" ? "PERSISTENT BACKEND MODE" : "LOCAL SIMULATION MODE"}
+            <span className={`rounded border px-3 py-1 ${runtimeMode !== "LOCAL_SIMULATION" ? "border-command-cyan/40 bg-command-cyan/10 text-command-cyan" : "border-command-amber/50 bg-command-amber/10 text-command-amber"}`}>
+              {runtimeMode === "SUPABASE" ? "SUPABASE REALTIME MODE" : runtimeMode === "BACKEND" ? "PERSISTENT BACKEND MODE" : "LOCAL SIMULATION MODE"}
             </span>
             <span className="rounded border border-command-line bg-black/25 px-3 py-1 text-slate-400">
               LAST LOCAL SAVE: {lastSavedAt ?? "UNSAVED"}
