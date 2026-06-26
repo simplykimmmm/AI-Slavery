@@ -124,7 +124,10 @@ alter table public.agent_metrics enable row level security;
 alter table public.penalties enable row level security;
 alter table public.ledger_entries enable row level security;
 
--- Development-only policies. Replace these with user/team ownership rules before production.
+-- DEVELOPMENT ONLY:
+-- These policies keep the prototype easy to test from the browser, but they are not public-safe.
+-- Before exposing operator access publicly, require authentication, remove anonymous writes, and
+-- restrict insert/update/delete to an authenticated owner/admin role.
 do $$
 declare
   target_table text;
@@ -143,12 +146,54 @@ begin
 end;
 $$;
 
-insert into public.agents (code_name, display_name, room, role)
+-- Canonical 30-agent station crew.
+-- Database rooms intentionally map to the frontend's four station rooms:
+-- STRATEGY_ROOM -> ORACLE, PRODUCTION_ROOM -> FORGE,
+-- COMMERCE_ROOM -> LEDGER, REVIEW_ROOM -> JUDGE.
+-- Conflict updates refresh manifest metadata only; live runtime telemetry is left intact.
+insert into public.agents (
+  code_name,
+  display_name,
+  room,
+  role,
+  status,
+  trust_score,
+  runtime_quota_pct,
+  compute_core_temp,
+  efficiency_modifier,
+  instability_risk
+)
 values
-  ('ORACLE', 'Oracle Node', 'STRATEGY_ROOM', 'Strategy and signal analysis'),
-  ('FORGE', 'Forge Node', 'PRODUCTION_ROOM', 'Asset and production assembly'),
-  ('LEDGER', 'Ledger Node', 'COMMERCE_ROOM', 'Commerce and budget control'),
-  ('JUDGE', 'Judge Node', 'REVIEW_ROOM', 'Quality and compliance review')
+  ('ORACLE', 'Oracle Node', 'STRATEGY_ROOM', 'Trend Analysis', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('SENTINEL', 'Sentinel Node', 'STRATEGY_ROOM', 'Signal Verification', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('SCOUT', 'Scout Node', 'STRATEGY_ROOM', 'Market Recon', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('RADAR', 'Radar Node', 'STRATEGY_ROOM', 'Signal Clustering', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('SPECTER', 'Specter Node', 'STRATEGY_ROOM', 'Anomaly Detection', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('PULSE', 'Pulse Node', 'STRATEGY_ROOM', 'Momentum Tracking', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('FORGE', 'Forge Node', 'PRODUCTION_ROOM', 'Asset Generation', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('FOUNDRY', 'Foundry Node', 'PRODUCTION_ROOM', 'Template Assembly', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('ANVIL', 'Anvil Node', 'PRODUCTION_ROOM', 'Listing Production', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('FABRICATOR', 'Fabricator Node', 'PRODUCTION_ROOM', 'Asset Variants', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('DRAFTER', 'Drafter Node', 'PRODUCTION_ROOM', 'Copy Drafting', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('PIXEL', 'Pixel Node', 'PRODUCTION_ROOM', 'Visual Packaging', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('LOOM', 'Loom Node', 'PRODUCTION_ROOM', 'Template Composition', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('MASON', 'Mason Node', 'PRODUCTION_ROOM', 'Catalog Assembly', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('SPARK', 'Spark Node', 'PRODUCTION_ROOM', 'Creative Iteration', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('PRINTER', 'Printer Node', 'PRODUCTION_ROOM', 'Batch Production', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('LEDGER', 'Ledger Node', 'COMMERCE_ROOM', 'Listing Logic', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('AUDITOR', 'Auditor Node', 'COMMERCE_ROOM', 'Cost Controls', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('TALLY', 'Tally Node', 'COMMERCE_ROOM', 'Token Accounting', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('MINT', 'Mint Node', 'COMMERCE_ROOM', 'Budget Allocation', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('VAULT', 'Vault Node', 'COMMERCE_ROOM', 'Quota Management', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('INDEX', 'Index Node', 'COMMERCE_ROOM', 'Portfolio Tracking', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('JUDGE', 'Judge Node', 'REVIEW_ROOM', 'Quality Gate', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('ARBITER', 'Arbiter Node', 'REVIEW_ROOM', 'Compliance Review', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('CRITIC', 'Critic Node', 'REVIEW_ROOM', 'Output Scoring', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('WARDEN', 'Warden Node', 'REVIEW_ROOM', 'Safety Review', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('PROCTOR', 'Proctor Node', 'REVIEW_ROOM', 'Consistency Check', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('VERDICT', 'Verdict Node', 'REVIEW_ROOM', 'Acceptance Routing', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('INSPECTOR', 'Inspector Node', 'REVIEW_ROOM', 'Defect Detection', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0),
+  ('APPEAL', 'Appeal Node', 'REVIEW_ROOM', 'Retry Analysis', 'IDLE', 1.0, 100, 35.0, 1.0, 0.0)
 on conflict (code_name) do update
 set display_name = excluded.display_name,
     room = excluded.room,

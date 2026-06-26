@@ -547,7 +547,9 @@ export function CommanderDashboard() {
         />
         {!supabaseStatus.configured && (
           <div className="rounded border border-command-amber/40 bg-command-amber/10 px-4 py-2 text-sm text-command-amber">
-            Supabase is not configured. The dashboard is using its backend or local simulation fallback.
+            {runtimeMode === "BACKEND"
+              ? "Supabase not configured — using Backend Runtime v1 fallback."
+              : "Supabase not configured — running in local simulation mode."}
           </div>
         )}
         {supabaseStatus.configured && supabaseStatus.loading && (

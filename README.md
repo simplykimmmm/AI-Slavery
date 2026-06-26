@@ -51,7 +51,7 @@ The existing Vercel frontend remains a normal static Vite build. PostgreSQL, Red
 Supabase is the preferred frontend persistence layer when both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured. If either value is absent, the dashboard displays a warning and continues with Backend Runtime v1 or its browser-local simulation.
 
 1. Create a Supabase project.
-2. Open its SQL Editor and run [`supabase/schema.sql`](supabase/schema.sql). This creates the agent/task/log/metric/penalty/ledger tables, development RLS policies, Realtime publication entries, triggers, and four seed agents.
+2. Open its SQL Editor and run [`supabase/schema.sql`](supabase/schema.sql). This creates the agent/task/log/metric/penalty/ledger tables, development RLS policies, Realtime publication entries, triggers, and the full 30-agent crew. The seed is idempotent, so running it again adds missing agents and refreshes manifest metadata without duplicating rows.
 3. In Database → Publications, confirm `agents`, `tasks`, and `agent_logs` are enabled for `supabase_realtime` (the schema script also attempts this automatically).
 4. Copy `.env.example` to `.env`, then set:
 
@@ -62,7 +62,28 @@ Supabase is the preferred frontend persistence layer when both `VITE_SUPABASE_UR
 
 5. Run `npm install` and `npm run dev`.
 
-For Vercel, add the same two `VITE_` variables to the project and redeploy. These values are intended for browser use; never expose the Supabase service-role key. The included anonymous/authenticated policies are deliberately permissive for development and must be replaced with user or team ownership policies before production.
+For Vercel, add the same two `VITE_` variables to the project and redeploy. If the frontend should call Backend Runtime v1, also set `VITE_API_URL` to that backend's public HTTPS URL. These values are intended for browser use; never expose the Supabase service-role key.
+
+The included anonymous/authenticated Supabase policies are deliberately permissive for development. Before public operator access, add authentication, remove anonymous write access, and restrict insert/update/delete to an authenticated owner/admin role.
+
+## Production deployment checklist
+
+1. Merge `codex/groq-agent-runner` into `main` after `npm run typecheck`, `npm test`, and `npm run build` pass.
+2. In Supabase SQL Editor, run the latest [`supabase/schema.sql`](supabase/schema.sql) so production has the 30-agent crew and Realtime publication entries.
+3. In Vercel, configure:
+
+   ```text
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   VITE_API_URL=https://your-backend.example.com
+   ```
+
+   `VITE_API_URL` is optional when Supabase-only dashboard persistence is enough.
+
+4. Redeploy/promote the Vercel frontend from `main`.
+5. If using the persistent queue/worker backend, host `server/` on infrastructure that supports long-running Node processes with PostgreSQL and Redis. A static Vercel frontend alone will not run the persistent worker loop.
+6. In Supabase Database -> Publications, verify `agents`, `tasks`, and `agent_logs` are enabled for `supabase_realtime`.
+7. Before opening the app publicly, replace development RLS with authenticated ownership/admin policies.
 
 ## Commands
 
